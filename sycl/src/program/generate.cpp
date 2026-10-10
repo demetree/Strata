@@ -8361,18 +8361,12 @@ const void* hit = (it == b2 + nb2) ? nullptr : (const void*) it;
             std::fflush(stderr);
         };
         {
-            // what is left once everything is allocated: under WDDM a GPU filled to the brim does not fail, it pages -
-            // and a page-in while the verify graph spins on a host flag stalls the request for good
-            size_t free_b = 0, total_b = 0;
-            /*
-            DPCT1106: 'cudaMemGetInfo' was migrated with the Intel
-            extensions for device information which may not be supported by all
-            compilers or runtimes. You may need to adjust the code.
-            */
-            dpct::get_current_device().get_memory_info(free_b, total_b);
-            // below ~256 MiB a later allocation (a first-used window's buffers, the desktop, another program) can make
-            // the driver page GPU memory, and a verify graph spinning on a host flag then never finishes
-            const int64_t free_mib = (int64_t) (free_b >> 20);
+            // #1549: the same source the expert cache was sized from - device_free_bytes(), which asks the
+            // OS (DXGI on Windows) and then applies the margin for what the session still allocates.
+            // Reading get_memory_info() here instead gave a figure that moves with nothing, so this check
+            // could report thousands of MiB free and pass while the card was in fact full - and a later
+            // allocation then died in queue creation.
+            const size_t free_b = strata::core::device_free_bytes();            const int64_t free_mib = (int64_t) (free_b >> 20);
             if (free_mib >= 256) {
                 std::fprintf(stderr, "strata serve: %lld MiB of VRAM free with everything loaded\n", (long long) free_mib);
                 rss_probe("serving");
