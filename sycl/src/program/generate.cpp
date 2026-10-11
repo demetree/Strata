@@ -4387,13 +4387,10 @@ int main(int argc, char **argv) try {
     std::vector<int64_t> sized_slots;
     uint64_t per_layer_bytes = 0;
     if (native_pack && o.expert_cache > 0 && o.expert_cache_per_layer) {
+        // #1549: device_free_bytes(), the same live figure the auto branch above sizes from, rather
+        // than get_memory_info() here - on this backend that one moves with nothing.
         size_t free_b = 0, total_b = 0;
-        /*
-        DPCT1106: 'cudaMemGetInfo' was migrated with the Intel extensions
-        for device information which may not be supported by all compilers or
-        runtimes. You may need to adjust the code.
-        */
-        dpct::get_current_device().get_memory_info(free_b, total_b);
+        free_b = strata::core::device_free_bytes(); (void) total_b;
         const auto& lay = strata::kernels::cpu::expert_layout();
         const int asked = o.expert_cache;
         const uint64_t budget = (uint64_t) asked * lay.max_blob;
